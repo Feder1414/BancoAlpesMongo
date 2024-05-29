@@ -43,7 +43,7 @@ class CrearSolicitudViewSet(APIView):
         if solicitudes_recientes:
             if len(solicitudes_recientes.solicitudes) == 10:
                 solicitudes_recientes.solicitudes.pop(0)
-                solicitudes_recientes.cantidadSolicitudes -= 1
+                
             solicitudes_recientes.solicitudes.append(solicitudEmbebida)
             solicitudes_recientes.cantidadSolicitudes += 1
         else:
