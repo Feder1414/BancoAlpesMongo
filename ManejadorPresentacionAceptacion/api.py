@@ -48,14 +48,10 @@ class CrearSolicitudViewSet(APIView):
             solicitudes_recientes.cantidadSolicitudes += 1
         else:
             solicitudes_recientes = SolicitudesRecientes(idCliente=idCliente, solicitudes=[solicitudEmbebida], cantidadSolicitudes=1)
-        
         solicitud.save()
         solicitudes_recientes.save()
-
         solicitud_dict = solicitud.to_mongo().to_dict()
         solicitud_json = dumps(solicitud_dict)
-
-
         return Response(data = solicitud_json,status=status.HTTP_201_CREATED)
     
 class CrearOfertaViewSet(APIView):
