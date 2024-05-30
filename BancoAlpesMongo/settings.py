@@ -86,6 +86,7 @@ WSGI_APPLICATION = 'BancoAlpesMongo.wsgi.application'
 # }
 
 connect(host="mongodb://monitoring_user:isis2503@10.128.0.9:27017")
+#connect(host="mongodb://localhost:27017/BancoAlpes")
 # Password validation
 # https://docs.djangoproject.com/en/5.0/ref/settings/#auth-password-validators
 
@@ -128,4 +129,5 @@ STATIC_URL = 'static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
-PATH_PER = "http://" + os.environ.get("VARIABLES_HOST", "10.128.0.3") + ":" + os.environ.get("VARIABLES_PORT", "8080") + "/clientes/"
+#PATH_PER = "http://" + os.environ.get("VARIABLES_HOST", "10.128.0.3") + ":" + os.environ.get("VARIABLES_PORT", "8080") + "/clientes/"
+PATH_PER = "http://" + os.environ.get("VARIABLES_HOST", "localhost") + ":" + os.environ.get("VARIABLES_PORT", "8000") + "/clientes/"

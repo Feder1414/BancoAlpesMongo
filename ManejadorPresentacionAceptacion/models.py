@@ -26,7 +26,8 @@ class SolicitudesRecientes(Document):
     cantidadSolicitudes = IntField()
 
 class Contador(Document):
-    idSolicitud = IntField(required=True)
+    idSolicitud = IntField()
+    idOferta = IntField()
     
 
 

@@ -3,8 +3,10 @@ from rest_framework.response import Response
 from rest_framework import status
 from .models import Solicitud, SolicitudesRecientes, Oferta , SolicitudEmbebida, Contador
 import requests
-from bson.json_util import dumps
+from bson.json_util import dumps, default
 from django.conf import settings
+from .logic import validate_jwt
+import time
 
 
 def checkCliente(idCliente, token):
@@ -16,22 +18,25 @@ def checkCliente(idCliente, token):
 
 class CrearSolicitudViewSet(APIView):
     def post(self, request):
-        idCliente = request.data.get('idCliente')
         token = request.META.get('HTTP_AUTHORIZATION', " ").split(' ')[1]
+        payload = validate_jwt(token)
+        idCliente = request.data.get('idCliente')
         if idCliente == None:
             return Response(data = "No se envio el id del cliente",status=status.HTTP_400_BAD_REQUEST)
         if token == None:
             return Response(data = "No se envio el token",status=status.HTTP_400_BAD_REQUEST)
         clienteExiste, cliente = checkCliente(idCliente, token)
-        print(clienteExiste, cliente.json())
+        cliente = cliente.json()
         if not clienteExiste:
             return Response(data = "No se encontro el cliente",status=status.HTTP_404_NOT_FOUND)
-        print(cliente.json())
+        if payload["idPersona"] != cliente["id"]:
+            return Response(data = "No tiene autorizacion para acceder a este recurso",status=status.HTTP_403_FORBIDDEN)
+   
         ContadorSolicitud = Contador.objects().first()
         idSolicitud = 0
         if ContadorSolicitud == None:
             idSolicitud = 0
-            ContadorSolicitud = Contador(idSolicitud=idSolicitud+1)
+            ContadorSolicitud = Contador(idSolicitud=idSolicitud+1, idOferta=0)
             ContadorSolicitud.save()
         else:
             idSolicitud = ContadorSolicitud.idSolicitud
@@ -56,26 +61,82 @@ class CrearSolicitudViewSet(APIView):
     
 class CrearOfertaViewSet(APIView):
     def post(self, request):
+        token = request.META.get('HTTP_AUTHORIZATION', " ").split(' ')[1]
+        payload = validate_jwt(token)
         idSolicitud = request.data.get('idSolicitud')
-        solicitud = SolicitudEmbebida.objects(id=idSolicitud)[0].first()
+        solicitud = Solicitud.objects(idSolicitud=idSolicitud).first()
         if solicitud == None:
             return Response(data = "No se encontro la solicitud",status=status.HTTP_404_NOT_FOUND)
-        idCliente = {'idCliente': solicitud.idCliente}
-        url = "http://10.128.0.5:8080/api/ofertas/generar-oferta/"
-        clienteSolicitud = requests.post(url, json=idCliente)
-        clienteSolicitudDict = clienteSolicitud.json()
-        if (len(clienteSolicitudDict) == 0):
+        idCliente = solicitud.idCliente
+        existe,cliente = checkCliente(idCliente, token)
+        cliente = cliente.json()
+        if payload["idPersona"] != cliente["id"]:
+            return Response(data = "No tiene autorizacion para acceder a este recurso",status=status.HTTP_403_FORBIDDEN)
+        if not existe:
             return Response(data = "No se encontro el cliente",status=status.HTTP_404_NOT_FOUND)
-        if ["informacionFinanciera"] not in clienteSolicitudDict:
-            return Response(data = "El cliente no tiene informaciónFinanciera" ,status=status.HTTP_404_NOT_FOUND)
-        if clienteSolicitudDict["informacionFinanciera"]["ingresos"] < clienteSolicitudDict["informacionFinanciera"]["egresos"]:
+        if cliente["informacion_financiera"] == None:
+            return Response(data = "El cliente no tiene informacion financiera",status=status.HTTP_404_NOT_FOUND)
+        if cliente["informacion_financiera"]["ingresos"] < cliente["informacion_financiera"]["egresos"]:
             return Response(data = "El cliente no tiene capacidad de pago",status=status.HTTP_404_NOT_FOUND)
         
-        url2 = "http://10.128.0.5:8080/api/ofertas/generar-oferta/"
-
-        oferta = requests.post(url2, json= clienteSolicitudDict)["informacionFinanciera"]
-
+        #url = "http://localhost:8069/api/ofertas/generar-oferta/"
+        url = "http://10.128.0.5:8080/api/ofertas/generar-oferta/"
+        oferta = requests.post(url, json= cliente["informacion_financiera"])
+        if oferta.status_code != 201:
+            return Response(data = "No se pudo generar la oferta",status=status.HTTP_404_NOT_FOUND)
+        oferta = oferta.json()
+        contador = Contador.objects().first()
+        idOferta = contador.idOferta
+        contador.idOferta += 1
+        contador.save()
+        ofertaMongo = Oferta(idOferta = idOferta,**oferta)
+        solicitud.ofertas.append(ofertaMongo)
+        solicitud_cliente_reciente = SolicitudesRecientes.objects(idCliente=solicitud.idCliente).first()
+        solicitudes_recientes = solicitud_cliente_reciente.solicitudes
+        for solicitud_reciente in solicitudes_recientes:
+            if solicitud_reciente.idSolicitud == solicitud.idSolicitud:
+                solicitud_reciente.ofertas.append(ofertaMongo)
+        solicitud.save()
+        solicitud_cliente_reciente.save()
         return Response(data = oferta,status=status.HTTP_201_CREATED)
+    
+class GetOfertasCliente(APIView):
+    def post(self, request):
+        token = request.META.get('HTTP_AUTHORIZATION', " ").split(' ')[1]
+        payload = validate_jwt(token)
+        start_time = time.time()
+        idCliente = request.data.get('idCliente')
+        if idCliente == None:
+            return Response(data = "No se envio el id del cliente",status=status.HTTP_400_BAD_REQUEST)
+        existe, cliente = checkCliente(idCliente, token)
+        cliente = cliente.json()
+        if not existe:
+            return Response(data = "No se encontro el cliente",status=status.HTTP_404_NOT_FOUND)
+        if payload["idPersona"] != cliente["id"]:
+            return Response(data = "No tiene autorizacion para acceder a este recurso",status=status.HTTP_403_FORBIDDEN)    
+        solicitudes_recientes = SolicitudesRecientes.objects(idCliente=idCliente).first()
+        if solicitudes_recientes == None:
+            return Response(data = "No se encontraron solicitudes para este cliente",status=status.HTTP_404_NOT_FOUND)
+        ofertas = []
+
+        if solicitudes_recientes.cantidadSolicitudes  > 10:
+            solicitudes = Solicitud.objects(idCliente=idCliente)
+            for solicitud in solicitudes:
+                for oferta in solicitud.ofertas:
+                    ofertas.append(oferta.to_mongo().to_dict())
+        else:
+            for solicitud in solicitudes_recientes.solicitudes:
+                for oferta in solicitud.ofertas:
+                    ofertas.append(oferta.to_mongo().to_dict())
+
+        ofertas_json = dumps(ofertas, default=default)
+
+        end_time = time.time()
+        elapsed_time = end_time - start_time
+        print(f"La función se ejecutó en {elapsed_time} segundos")
+
+        return Response(data = ofertas_json,status=status.HTTP_200_OK)
+            
 
 
         
