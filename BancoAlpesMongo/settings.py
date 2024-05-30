@@ -129,5 +129,5 @@ STATIC_URL = 'static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
-#PATH_PER = "http://" + os.environ.get("VARIABLES_HOST", "10.128.0.3") + ":" + os.environ.get("VARIABLES_PORT", "8080") + "/clientes/"
-PATH_PER = "http://" + os.environ.get("VARIABLES_HOST", "localhost") + ":" + os.environ.get("VARIABLES_PORT", "8000") + "/clientes/"
+PATH_PER = "http://" + os.environ.get("VARIABLES_HOST", "10.128.0.12") + ":" + os.environ.get("VARIABLES_PORT", "8080") + "/clientes/"
+#PATH_PER = "http://" + os.environ.get("VARIABLES_HOST", "localhost") + ":" + os.environ.get("VARIABLES_PORT", "8000") + "/clientes/"
