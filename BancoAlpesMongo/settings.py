@@ -85,11 +85,7 @@ WSGI_APPLICATION = 'BancoAlpesMongo.wsgi.application'
 #     }
 # }
 
-connect(
-    db='BancoAlpes',
-    host='localhost',
-    port=27017
-)
+connect(host="mongodb://monitoring_user:isis2503@10.128.0.9:27017")
 # Password validation
 # https://docs.djangoproject.com/en/5.0/ref/settings/#auth-password-validators
 
